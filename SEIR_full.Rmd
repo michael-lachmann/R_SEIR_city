@@ -1,0 +1,152 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+a = as.matrix(read.csv("C:\\Users\\Michael Lachmann\\Documents\\CV19\\py\\SEIR-city\\data\\Excel Data\\Contact Matrix - 5 age groups.csv"))
+b = read.csv("C:\\Users\\Michael Lachmann\\Documents\\CV19\\py\\SEIR-city\\data\\Austin Data\\AustinMSA Population - 5 age groups.csv")
+pp=tail( colSums(b),5)
+Pop_Metro=pp
+phi2=a
+```
+
+
+```{r}
+
+make.SEIR.f=function( 
+phi2 = matrix( c(0.38911 ,0.15035 ,0.051559 ,0.33103 ,0.026997 ,
+                    0.15035 ,0.55014 ,0.24749 ,0.15115 ,0.042212 ,
+                    0.051559 ,0.24749 ,0.51324 ,0.32767 ,0.018958 ,
+                    0.33103 ,0.15115 ,0.32767 ,0.17335 ,0.11636 ,
+                    0.026997 ,0.042212 ,0.018958 ,0.11636 ,0.08999), 5, 5),
+Pop_Metro2 = matrix( c(128527,   9350 ,327148, 37451, 915894,
+                      156209, 249273 ,108196,132505, 103763 ),2,5),
+T_Y_TO_R_PARA = 22.6,  # median of  [21.1, 22.6, 24.4]
+T_EXPOSED_PARA = 7.0, # median of  [5.6, 7, 8.2]
+ASYMP_RATE = 0.179,
+PROP_TRANS_IN_E = 0.126,
+T_ONSET_TO_H = 5.9,
+T_H_TO_R = 14.0 ,
+T_H_TO_D = 14.0 ,
+symp_h_ratio_overall = c(0.00048721, 0.00048721, 0.03287572, 0.11337395, 0.17733063),
+hosp_f_ratio = c(0.04 , 0.12365475, 0.03122403, 0.10744644, 0.23157691),
+symp_h_ratio = rbind( 
+		c(2.79135866e-04, 2.14621858e-04, 1.32154040e-02, 2.85633688e-02, 3.38733218e-02),
+		c(2.79135866e-03, 2.14621858e-03, 1.32154040e-01, 2.85633688e-01, 3.38733218e-01) ),
+symp_h_ratio_corrrect = c(
+		1.610326595443765, 1.924464960134284, 2.31133016137442, 3.724051596082457, 4.95257504190157
+	) # hospitalization is 10 times higher for high risk individuals. I made an average of 1*[num low]+10*[num high] for each age class.
+) {
+Pop_Metro = colSums( Pop_Metro2 )
+
+phi = 1 / Pop_Metro * phi2 
+
+
+
+	
+	gamma_h = 1.0 / T_H_TO_R 
+	gamma_y_c = 1.0 / T_Y_TO_R_PARA 
+	gamma_y = gamma_y_c 
+	gamma_a = gamma_y 
+
+	sigma_c = 1.0 / T_EXPOSED_PARA 
+	sigma = sigma_c ;
+
+	eta = 1.0 / T_ONSET_TO_H 
+
+	mu = 1.0 / T_H_TO_D 
+
+	tau = 1.0 - ASYMP_RATE 
+
+	omega_y = 1.0 ;
+	omega_h = 0.0 ;
+
+	#Only needed when there are no risk groups
+	#for( i=0; i<g.ngroup; i++)
+	#	symp_h_ratio[i] *= symp_h_ratio_corrrect[i] ;
+
+	
+	
+	nu = hosp_f_ratio * gamma_h / (mu  + (gamma_h - mu  ) * hosp_f_ratio )  # hosp_f_ratio is an array of size age.
+	pi = symp_h_ratio * gamma_y / (eta + (gamma_y - eta   ) * symp_h_ratio )  # symp_h_ratio is an array of size risk * age
+	# omega_e - relative infectiousness in E, IY, IA // symp_h_ratio_overall length age. 
+	omega_e = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall ) / gamma_y)) * 
+						omega_y * sigma * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E)            
+	# length age
+	omega_a = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall) / gamma_y_c)) * 
+						omega_y * sigma_c * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E) ;
+	
+	
+
+S=1; E=2; IY=3; IA=4; IH=5; RAY=6; RH=7 ; D=8
+N0 = array(0, c(5,2,8))
+n=length(N0)
+c1=N0
+c1[c(E,IY,IA,IH),,]=1
+
+oo=array(1:length(N0),dim(N0))
+# each entry in o1, o2 says where it comes from, from which entry in dX1, dX2 we should add.
+o1=N0;o2=N0;o1[]=oo[,,D];o2[]=oo[,,D] # initially, everything comes from D, because D will not change, so dX1, dX2 for D is 0.
+oo[,,c(S)] ->o1[,,c(E)]
+oo[,,c(E)] ->o1[,,c(IA)]; oo[,,c(E)] ->o2[,,c(IY)]
+oo[,,c(IY)]->o1[,,c(IH)]; oo[,,c(IY)]->o2[,,c(RAY)]
+oo[,,c(IH)]->o1[,,c(D)];  oo[,,c(IH)]->o2[,,c(RH)]
+oo[,,c(IA)]->o1[,,c(RAY)]
+
+
+# o1[,,c(S,IY,RH)] are themselves, and dI1 needs to be 0 there.
+# o2[,,c(S,IA,IH,D,RH)] are themselves, and dI2 needs to be 0 there.
+
+
+#c1 - How much does each category contribute to infections
+
+c1 = N0 # 0
+c1[,,E]  = omega_e
+c1[,,IY] = omega_y
+c1[,,IH] = omega_h
+c1[,,IA] = omega_a
+
+c2 = N0
+c2[,,S] = 1
+
+c3 = N0
+c3[,,E]  = sigma
+c3[,,IA] = gamma_a
+c3[,,IY] = (1-pi)*gamma_y + pi*eta
+c3[,,IH] = (1-nu)*gamma_h + nu*mu
+
+p2 = N0
+p2[,,E] = tau
+p2[,,IY] = (1-pi)*gamma_y / ( (1-pi)*gamma_y + pi*eta )
+p2[,,IH] = (1-nu)*gamma_h / ((1-nu)*gamma_h + nu*mu)
+
+
+SEIR.sto=function(X,beta,dt=1) {
+  II=c(rowSums(X*c1) %*% phi)   # how many infect each age of S
+  p1=II*c2*beta+c3                    # calculate transition rates
+  dX = rbinom(n,X,  exp(-p1*dt))               # how many move to new state
+  dX1= rbinom(n,dX, exp(-p2*dt))             # select between two possible next states for some
+  dX2= dX-dX1                  # other possibile state
+  X-dX+dX1[o1]+dX2[o2]        # o1 and o2 say what adds to what state
+}
+
+SEIR.det=function(X,beta,dt=1) {
+  II=c(rowSums(X*c1) %*% phi)   # how many infect each age of S
+  p1=II*c2*beta+c3                    # calculate transition rates
+  dX =  X*exp(-p1*dt)               # how many move to new state
+  dX1= dX*exp(-p2*dt)             # select between two possible next states for some
+  dX2= dX-dX1                    # other possibile state
+  X-dX+dX1[o1]+dX2[o2]        # o1 and o2 say what adds to what state
+}
+  list( det=SEIR.det, sto=SEIR.stoch )
+}
+
+SEIR=make.SEIR.f()
+SEIR.det = SEIR$det
+SEIR.sto = SEIR$sto
+
+
+```
+
