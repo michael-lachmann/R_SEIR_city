@@ -126,7 +126,7 @@ p2[,,IH] = (1-nu)*gamma_h / ((1-nu)*gamma_h + nu*mu)
 SEIR.sto=function(X,beta,dt=1) {
   II=c(rowSums(X*c1) %*% phi)   # how many infect each age of S
   p1=II*c2*beta+c3                    # calculate transition rates
-  dX = rbinom(n,X,  exp(-p1*dt))               # how many move to new state
+  dX = rbinom(n,X,  1-exp(-p1*dt))               # how many move to new state
   dX1= rbinom(n,dX, exp(-p2*dt))             # select between two possible next states for some
   dX2= dX-dX1                  # other possibile state
   X-dX+dX1[o1]+dX2[o2]        # o1 and o2 say what adds to what state
@@ -135,7 +135,7 @@ SEIR.sto=function(X,beta,dt=1) {
 SEIR.det=function(X,beta,dt=1) {
   II=c(rowSums(X*c1) %*% phi)   # how many infect each age of S
   p1=II*c2*beta+c3                    # calculate transition rates
-  dX =  X*exp(-p1*dt)               # how many move to new state
+  dX =  X*(1-exp(-p1*dt))               # how many move to new state
   dX1= dX*exp(-p2*dt)             # select between two possible next states for some
   dX2= dX-dX1                    # other possibile state
   X-dX+dX1[o1]+dX2[o2]        # o1 and o2 say what adds to what state
