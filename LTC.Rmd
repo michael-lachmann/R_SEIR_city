@@ -47,7 +47,7 @@ phi.L = aperm( phi.L, c(1,3,2))
 
 
 
-N.pat=2
+N.pat=50
 	
 	gamma_h = 1.0 / T_H_TO_R 
 	gamma_y_c = 1.0 / T_Y_TO_R_PARA 
@@ -158,9 +158,12 @@ N.pat=N.pat
 ) {
 Pop_Metro = colSums( Pop_Metro2 )
 
-phi = 1 / Pop_Metro * phi2 
-phi.L = array( phi, c(5,5,N.pat))
-phi.L = aperm( phi.L, c(1,3,2))
+phiM = 1 / Pop_Metro * phi2 
+phiLTC = 1 / 200 * phi2 *10
+phi.L = array( 0, c(5,N.pat,5))
+phi.L[,1,] = phiM
+
+phi.L[,-1,] = phiLTC
 
 
 
@@ -243,9 +246,9 @@ p2[,,,IH] = (1-nu)*gamma_h / ((1-nu)*gamma_h + nu*mu)
 
 
 SEIR.sto=function(X,beta,dt=1) {
-  II=c(apply( c(apply(X*c1,c(1,2),sum)) * phi.L ,c(3,2),sum))
+  II=c(apply( c(apply(X*c1,c(1,2),sum)) * phi.L * beta ,c(3,2),sum))
 #  II=c(rowSums(X*c1) %*% phi)   # how many infect each age of S
-  p1=II*c2*beta+c3                    # calculate transition rates
+  p1=II*c2+c3                    # calculate transition rates
   dX = rbinom( n,  X, 1-exp(-p1*dt))               # how many move to new state
   dX1= rbinom( n, dX, exp(-p2*dt))             # select between two possible next states for some
   dX2= dX-dX1                    # other possibile state
@@ -267,7 +270,7 @@ SEIR.det=function(X,beta,dt=1) {
   list( det=SEIR.det, sto=SEIR.sto )
 }
 
-SEIR=make.SEIR.f(N.pat=2)
+SEIR=make.SEIR.f(N.pat=3)
 SEIR.det = SEIR$det
 SEIR.sto = SEIR$sto
 
@@ -280,17 +283,46 @@ for each separately
 
 
 ```{r}
+N.pat=50
+SEIR=make.SEIR.f(N.pat=N.pat)
+SEIR.det = SEIR$det
+SEIR.sto = SEIR$sto
+
 S=1; E=2; IY=3; IA=4; IH=5; RAY=6; RH=7 ; D=8
-X = array(0,c(5,2,2,8))
+X = array(0,c(5,N.pat,2,8))
 X[,1,,S] = t(Pop_Metro2)
 X[ ,1, ,E] = 10
 X[5,-1,,S] = 100
-Xt=array(0,c(100,8))
-bt=c(rep(0.2,30),rep(0.01,70))
-for( i in 1:100) { 
-  X=SEIR.sto(X,beta=0.7,dt=1)
-  Xt[i,] = apply(X,4,sum)
+Xt=array(0,c(100,N.pat,8))
+bt=c(rep(1.7,30),rep(0.04,70))
+worker.n=20; Nar=length(X[3,1,,]); Npop=sum(X[3,1,,])
+bt=array(0,c(5,N.pat,5))
+bt1=bt; bt1[,1,]=0.2 ; bt1[,-1,]=0.2
+bt2=bt; bt2[,1,]=0.01; bt2[,-1,]=0.2
+for( i in 1:30) { 
+  workers=array( rbinom(Nar*(N.pat-1), rep(X[3,1,,],N.pat-1), prob= worker.n/ Npop ), c(2,8,N.pat-1))
+  X[3, 1,,]=X[3,1,,]-apply(workers,c(1,2),sum)
+  X[3,-1,,]=X[3,-1,,]+aperm(workers,c(3,1,2))
+  X=SEIR.sto(X,beta=bt1,dt=0.5)
+  Xt[i,,] = apply(X,c(2,4),sum)
+#  Xt[i,,] = apply(X,c(2,4),sum)
+  X[3,1,,] = X[3,1,,]+ apply(X[3,-1,,,drop=F],c(3,4),sum)
+  X[3,-1,,] = 0
+  X=SEIR.sto(X,beta=bt1,dt=0.5)
 }
-plot(Xt[,IY])
+for( i in 31:100) { 
+  workers=array( rbinom(Nar*(N.pat-1), rep(X[3,1,,],N.pat-1), prob= worker.n/ Npop ), c(2,8,N.pat-1))
+  X[3, 1,,]=X[3,1,,]-apply(workers,c(1,2),sum)
+  X[3,-1,,]=X[3,-1,,]+aperm(workers,c(3,1,2))
+  X=SEIR.sto(X,beta=bt2,dt=0.5)
+  Xt[i,,] = apply(X,c(2,4),sum)
+#  Xt[i,,] = apply(X,c(2,4),sum)
+  X[3,1,,] = X[3,1,,]+ apply(X[3,-1,,,drop=F],c(3,4),sum)
+  X[3,-1,,] = 0
+  X=SEIR.sto(X,beta=bt2,dt=0.5)
+}
+plot(Xt[,1,IY])
+plot(Xt[,4,IY])
+
 ```
 
