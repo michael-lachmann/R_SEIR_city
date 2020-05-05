@@ -296,9 +296,9 @@ N.LTC=54; LTC.size=200
 # How many workers visit each facility every day
 worker.n=20
 # beta for Metro before and after
-beta1 = 0.3; beta2 = 0.02
+beta1 = 0.17; beta2 = 0.01
 # beta for LTC
-betaLTC = 3
+betaLTC = 2
 # how long in beta1
 T1 = 30 
 
@@ -368,12 +368,17 @@ for( i in (T1+1):200) {
   X[3,-1,,] = 0
   X=SEIR.sto(X,beta=bt2,dt=0.5)
 }
-plot(Xt[,1,IH])
+plot( apply( Xt[,  ,IH],1,sum),type="l")
+lines(apply( Xt[,-1,IH],1,sum),col=2)
+plot( apply( Xt[,  ,IY],1,sum),type="l")
+lines(apply( Xt[,-1,IY],1,sum),col=2)
+plot( apply( Xt[,  ,RAY],1,sum),type="l")
+lines(apply( Xt[,-1,RAY],1,sum),col=2)
 plot(Xt[,1,D])
 plot(Xt[,2,D])
 
 plot(apply(Xt[,-1,D],1,sum)/apply(Xt[,,D],1,sum),main="Fraction of deaths from LTC")
-plot(apply(Xt[,-1,D],1,sum)/apply(Xt[,,D],1,sum),main="Fraction in H from LTC")
+plot(apply(Xt[,-1,IH],1,sum)/apply(Xt[,,IH],1,sum),main="Fraction in H from LTC")
 
 ```
 
@@ -385,9 +390,9 @@ N.LTC=2; LTC.size=20
 # How many workers visit each facility every day
 worker.n=2
 # beta for Metro before and after
-beta1 = 0.3; beta2 = 0.02
+beta1 = 0.3; beta2 = 0.1
 # beta for LTC
-betaLTC = 3
+betaLTC = 2
 # how long in beta1
 T1 = 30 
 
