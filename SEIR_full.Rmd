@@ -5,8 +5,8 @@ output: html_notebook
 
 
 ```{r}
-a = as.matrix(read.csv("C:\\Users\\Michael Lachmann\\Documents\\CV19\\py\\SEIR-city\\data\\Excel Data\\Contact Matrix - 5 age groups.csv"))
-b = read.csv("C:\\Users\\Michael Lachmann\\Documents\\CV19\\py\\SEIR-city\\data\\Austin Data\\AustinMSA Population - 5 age groups.csv")
+a = as.matrix(read.csv("ContactMatrixAll_5AgeGroups.csv",header = F))
+b = read.csv("AustinMSA Population - 5 age groups.csv")
 pp=tail( colSums(b),5)
 Pop_Metro=pp
 phi2=a
@@ -16,13 +16,8 @@ phi2=a
 ```{r}
 
 make.SEIR.f=function( 
-phi2 = matrix( c(0.38911 ,0.15035 ,0.051559 ,0.33103 ,0.026997 ,
-                    0.15035 ,0.55014 ,0.24749 ,0.15115 ,0.042212 ,
-                    0.051559 ,0.24749 ,0.51324 ,0.32767 ,0.018958 ,
-                    0.33103 ,0.15115 ,0.32767 ,0.17335 ,0.11636 ,
-                    0.026997 ,0.042212 ,0.018958 ,0.11636 ,0.08999), 5, 5),
-Pop_Metro2 = matrix( c(128527,   9350 ,327148, 37451, 915894,
-                      156209, 249273 ,108196,132505, 103763 ),2,5),
+phi2 = phi2,
+Pop_Metro2 = Pop_Metro2,
 T_Y_TO_R_PARA = 22.6,  # median of  [21.1, 22.6, 24.4]
 T_EXPOSED_PARA = 7.0, # median of  [5.6, 7, 8.2]
 ASYMP_RATE = 0.179,

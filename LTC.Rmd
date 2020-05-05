@@ -7,23 +7,19 @@ output: html_notebook
 Read data
 
 ```{r}
-a = as.matrix(read.csv("Contact Matrix - 5 age groups.csv"))
+a = as.matrix(read.csv("ContactMatrixAll_5AgeGroups.csv",header = F))
 b = read.csv("AustinMSA Population - 5 age groups.csv")
 pp=tail( colSums(b),5)
 Pop_Metro=pp
-phi2=a
+Pop_Metro2.in = b[,-(1:2)]
+phi2.in=a
 ```
 
 
 This part is only needed for debugging. Ignore
 ```{r eval=FALSE}
-phi2 = matrix( c(0.38911 ,0.15035 ,0.051559 ,0.33103 ,0.026997 ,
-                    0.15035 ,0.55014 ,0.24749 ,0.15115 ,0.042212 ,
-                    0.051559 ,0.24749 ,0.51324 ,0.32767 ,0.018958 ,
-                    0.33103 ,0.15115 ,0.32767 ,0.17335 ,0.11636 ,
-                    0.026997 ,0.042212 ,0.018958 ,0.11636 ,0.08999), 5, 5)
-Pop_Metro2 = matrix( c(128527,   9350 ,327148, 37451, 915894,
-                      156209, 249273 ,108196,132505, 103763 ),2,5)
+phi2 = phi2
+Pop_Metro2 = Pop_Metro2
 T_Y_TO_R_PARA = 22.6  # median of  [21.1, 22.6, 24.4]
 T_EXPOSED_PARA = 7.0 # median of  [5.6, 7, 8.2]
 ASYMP_RATE = 0.179
@@ -80,7 +76,9 @@ phi.L[,-1,] = phiLTC
 	nu = hosp_f_ratio * gamma_h / (mu  + (gamma_h - mu  ) * hosp_f_ratio )  # hosp_f_ratio is an array of size age.
 	pi = symp_h_ratio * gamma_y / (eta + (gamma_y - eta   ) * symp_h_ratio )  # symp_h_ratio is an array of size risk * age
 	# omega_e - relative infectiousness in E, IY, IA // symp_h_ratio_overall length age. 
-	omega_e = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall ) / gamma_y)) * 
+	#omega_e = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall ) / gamma_y)) * 
+	#					omega_y * sigma * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E)            
+	omega_e = ((symp_h_ratio / eta) + ((1 - symp_h_ratio ) / gamma_y)) * 
 						omega_y * sigma * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E)            
 	# length age
 	omega_a = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall) / gamma_y_c)) * 
@@ -139,13 +137,8 @@ Function for building the stochastic and deterministic dynamics function.
 ```{r}
 
 make.SEIR.f=function( 
-phi2 = matrix( c(0.38911 ,0.15035 ,0.051559 ,0.33103 ,0.026997 ,
-                    0.15035 ,0.55014 ,0.24749 ,0.15115 ,0.042212 ,
-                    0.051559 ,0.24749 ,0.51324 ,0.32767 ,0.018958 ,
-                    0.33103 ,0.15115 ,0.32767 ,0.17335 ,0.11636 ,
-                    0.026997 ,0.042212 ,0.018958 ,0.11636 ,0.08999), 5, 5),
-Pop_Metro2 = matrix( c(128527,   9350 ,327148, 37451, 915894,
-                      156209, 249273 ,108196,132505, 103763 ),2,5),
+phi2 = phi2.in,
+Pop_Metro2 = Pop_Metro2.in,
 T_Y_TO_R_PARA = 22.6,  # median of  [21.1, 22.6, 24.4]
 T_EXPOSED_PARA = 7.0, # median of  [5.6, 7, 8.2]
 ASYMP_RATE = 0.179,
@@ -201,7 +194,9 @@ phi.L[,-1,] = phiLTC
 	nu = hosp_f_ratio * gamma_h / (mu  + (gamma_h - mu  ) * hosp_f_ratio )  # hosp_f_ratio is an array of size age.
 	pi = symp_h_ratio * gamma_y / (eta + (gamma_y - eta   ) * symp_h_ratio )  # symp_h_ratio is an array of size risk * age
 	# omega_e - relative infectiousness in E, IY, IA // symp_h_ratio_overall length age. 
-	omega_e = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall ) / gamma_y)) * 
+  #omega_e = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall ) / gamma_y)) * 
+	#					omega_y * sigma * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E)            
+	omega_e = ((symp_h_ratio / eta) + ((1 - symp_h_ratio ) / gamma_y)) * 
 						omega_y * sigma * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E)            
 	# length age
 	omega_a = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall) / gamma_y_c)) * 
@@ -253,7 +248,7 @@ p2[,,,IH] = (1-nu)*gamma_h / ((1-nu)*gamma_h + nu*mu)
 
 
 SEIR.sto=function(X,beta,dt=1) {
-  II=c(apply( c(apply(X*c1,c(1,2),sum)) * (phi.L * beta) ,c(3,2),sum))
+  II=c(apply( c(apply(X*c1,c(1,2),sum)) * (phi.L * beta *dt) ,c(3,2),sum))
 #  II=c(rowSums(X*c1) %*% phi)   # how many infect each age of S
   p1=II*c2+c3                    # calculate transition rates
   dX = rbinom( n,  X, 1-exp(-p1*dt))               # how many move to new state
@@ -264,7 +259,7 @@ SEIR.sto=function(X,beta,dt=1) {
 }
 
 SEIR.det=function(X,beta,dt=1) {
-  II=c(apply( c(apply(X*c1,c(1,2),sum)) * phi.L ,c(3,2),sum))
+  II=c(apply( c(apply(X*c1,c(1,2),sum)) * phi.L * beta *dt ,c(3,2),sum))
   
 #  II=c(rowSums(X*c1) %*% phi)   # how many infect each age of S
   p1=II*c2*beta+c3                    # calculate transition rates
@@ -292,15 +287,15 @@ We need to speci
 
 ```{r}
 # How many long term facilities are there, how big
-N.LTC=54; LTC.size=200
+N.LTC=54; LTC.size=300
 # How many workers visit each facility every day
-worker.n=20
+worker.n=10
 # beta for Metro before and after
-beta1 = 0.17; beta2 = 0.01
+beta1 = 0.035; beta2 = beta1 *(1-0.933)
 # beta for LTC
-betaLTC = 2
+betaLTC = 0.1
 # how long in beta1
-T1 = 30 
+T1 = 17
 
 
 N.pat=N.LTC+1; pat.size=LTC.size
@@ -368,17 +363,21 @@ for( i in (T1+1):200) {
   X[3,-1,,] = 0
   X=SEIR.sto(X,beta=bt2,dt=0.5)
 }
-plot( apply( Xt[,  ,IH],1,sum),type="l")
-lines(apply( Xt[,-1,IH],1,sum),col=2)
-plot( apply( Xt[,  ,IY],1,sum),type="l")
-lines(apply( Xt[,-1,IY],1,sum),col=2)
-plot( apply( Xt[,  ,RAY],1,sum),type="l")
-lines(apply( Xt[,-1,RAY],1,sum),col=2)
-plot(Xt[,1,D])
-plot(Xt[,2,D])
+plot( (1:200)/2, apply( Xt[,  ,IH],1,sum),type="l", ylab="heads in beds",xlab="days")
+lines((1:200)/2,apply( Xt[,-1,IH],1,sum),col=2)
+plot( (1:200)/2,apply( Xt[,  ,IY],1,sum),type="l", ylab="symptomatic cases",xlab="days")
+lines( (1:200)/2,apply( Xt[,-1,IY],1,sum),col=2)
+plot( (1:200)/2,apply( Xt[,  ,RAY],1,sum),type="l")
+lines((1:200)/2, apply( Xt[,-1,RAY],1,sum),col=2)
+plot((1:200)/2,Xt[,1,D])
+plot((1:200)/2,Xt[,2,D])
+plot((1:200)/2,Xt[,2,IY],ylim=c(0,60),type="l")
+for( i in 3:10) {
+  lines( (1:200)/2,Xt[,i,IY],col=i)
+}
 
-plot(apply(Xt[,-1,D],1,sum)/apply(Xt[,,D],1,sum),main="Fraction of deaths from LTC")
-plot(apply(Xt[,-1,IH],1,sum)/apply(Xt[,,IH],1,sum),main="Fraction in H from LTC")
+plot((1:200)/2,apply(Xt[,-1,D],1,sum)/apply(Xt[,,D],1,sum),main="Fraction of deaths from LTC", ylab="fraction",xlab="days",ylim=0:1,type="l")
+plot((1:200)/2,apply(Xt[,-1,IH],1,sum)/apply(Xt[,,IH],1,sum),main="Fraction in Hospital from LTC", ylab="fraction",xlab="days",ylim=0:1,type="l")
 
 ```
 
