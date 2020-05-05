@@ -67,12 +67,13 @@ phi = 1 / Pop_Metro * phi2
 	nu = hosp_f_ratio * gamma_h / (mu  + (gamma_h - mu  ) * hosp_f_ratio )  # hosp_f_ratio is an array of size age.
 	pi = symp_h_ratio * gamma_y / (eta + (gamma_y - eta   ) * symp_h_ratio )  # symp_h_ratio is an array of size risk * age
 	# omega_e - relative infectiousness in E, IY, IA // symp_h_ratio_overall length age. 
-	omega_e = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall ) / gamma_y)) * 
+  #omega_e = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall ) / gamma_y)) * 
+	#					omega_y * sigma * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E)            
+	omega_e = ((symp_h_ratio / eta) + ((1 - symp_h_ratio ) / gamma_y)) * 
 						omega_y * sigma * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E)            
 	# length age
 	omega_a = ((symp_h_ratio_overall / eta) + ((1 - symp_h_ratio_overall) / gamma_y_c)) * 
 						omega_y * sigma_c * PROP_TRANS_IN_E / (1 - PROP_TRANS_IN_E) ;
-	
 	
 
 S=1; E=2; IY=3; IA=4; IH=5; RAY=6; RH=7 ; D=8
