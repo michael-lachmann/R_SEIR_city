@@ -12,7 +12,7 @@ b = read.csv("AustinMSA Population - 5 age groups.csv")
 pp=tail( colSums(b),5)
 Pop_Metro=pp
 Pop_Metro2.in = b[,-(1:2)]
-phi2.in=a
+phi2.in=(a)
 ```
 
 
@@ -207,8 +207,6 @@ phi.L[,-1,] = phiLTC
 S=1; E=2; IY=3; IA=4; IH=5; RAY=6; RH=7 ; D=8
 ZERO = array(0, c(5,N.pat,2,8))
 n=length(ZERO)
-c1=ZERO
-c1[c(E,IY,IA,IH),,,]=1
 
 oo=array(1:length(ZERO),dim(ZERO))
 # each entry in o1, o2 says where it comes from, from which entry in dX1, dX2 we should add.
@@ -287,11 +285,11 @@ We need to speci
 
 ```{r}
 # How many long term facilities are there, how big
-N.LTC=54; LTC.size=300
+N.LTC=54; LTC.size=2
 # How many workers visit each facility every day
-worker.n=10
+worker.n=0
 # beta for Metro before and after
-beta1 = 0.035; beta2 = beta1 *(1-0.933)
+beta1 = 0.035; beta2 = beta1 *(1-0.80)
 # beta for LTC
 betaLTC = 0.1
 # how long in beta1
@@ -372,14 +370,121 @@ lines((1:200)/2, apply( Xt[,-1,RAY],1,sum),col=2)
 plot((1:200)/2,Xt[,1,D])
 plot((1:200)/2,Xt[,2,D])
 plot((1:200)/2,Xt[,2,IY],ylim=c(0,60),type="l")
-for( i in 3:10) {
-  lines( (1:200)/2,Xt[,i,IY],col=i)
+for( i in 3:55) {
+  lines( (1:200)/2,Xt[,i,IY],col=rainbow(54)[i])
 }
 
 plot((1:200)/2,apply(Xt[,-1,D],1,sum)/apply(Xt[,,D],1,sum),main="Fraction of deaths from LTC", ylab="fraction",xlab="days",ylim=0:1,type="l")
 plot((1:200)/2,apply(Xt[,-1,IH],1,sum)/apply(Xt[,,IH],1,sum),main="Fraction in Hospital from LTC", ylab="fraction",xlab="days",ylim=0:1,type="l")
 
 ```
+
+```{r}
+# How many long term facilities are there, how big
+N.LTC=54; LTC.size=2
+# How many workers visit each facility every day
+worker.n=0
+# beta for Metro before and after
+beta1 = 0.035; beta2 = beta1 *(1-0.93)
+# beta for LTC
+betaLTC = 0.1
+# how long in beta1
+T1 = 26
+
+
+N.pat=N.LTC+1; pat.size=LTC.size
+
+
+
+# make functions for model
+SEIR=make.SEIR.f(N.pat=N.pat, pat.size=200)
+SEIR.det = SEIR$det
+SEIR.sto = SEIR$sto
+
+# Just for convenience
+S=1; E=2; IY=3; IA=4; IH=5; RAY=6; RH=7 ; D=8
+
+
+X = array(0,c(5,N.pat,2,8),dimnames=list(colnames(a),c("M",rep("LTC",N.pat-1)),1:2,
+                                         c("S","E","IY","IA","IH","RAY","RH","D")))
+X[,1,,S] = t(Pop_Metro2)
+X[ , 1, ,E] = 10
+# calc how many in each facility are in each risk group
+p.risk = Pop_Metro2[,5]/sum(Pop_Metro2[,5])
+# put them in
+X[5,-1,,S] = rep(round(p.risk * LTC.size), each=N.LTC)
+# subtract from Metro pop
+X[5,1,,S] = X[5,1,,S] - apply(X[5,-1,,S,drop=F],3,sum)
+
+Xt=array(0,c(200,N.pat,5,8),dimnames=list())
+dimnames(Xt)[[4]]=dimnames(X)[[4]]
+
+Nar=length(X[3,1,,]); # age x risk = 10
+Npop=sum(X[3,1,,])    # num of adults
+
+# Beta needs to be a big structure so it just multiplies all compartments
+# 1st and 3rd dim are simply age, so can be ignored, 2nd dim is patch, so Metro=1
+# LTC = 2..N.pat
+bt=array(0,c(5,N.pat,5))
+bt1=bt; bt1[,1,]=beta1 ; bt1[,-1,]= betaLTC
+bt2=bt; bt2[,1,]=beta2 ; bt2[,-1,]= betaLTC
+for( i in 1:T1) { 
+  # sample workers from adults
+  workers=array( rbinom(Nar*(N.pat-1), rep(X[3,1,,],N.pat-1), prob= worker.n/ Npop ), c(2,8,N.pat-1))
+  # remove from Metro
+  X[3, 1,,]=X[3,1,,]-apply(workers,c(1,2),sum)
+  # add to LTC
+  X[3,-1,,]=X[3,-1,,]+aperm(workers,c(3,1,2))
+  # half day forward
+  X=SEIR.sto(X,beta=bt1,dt=0.5)
+  Xt[i,,,] = apply(X,c(2,1,4),sum)
+#  Xt[i,,] = apply(X,c(2,4),sum)
+  # Add workers for the night
+  X[3,1,,] = X[3,1,,]+ apply(X[3,-1,,,drop=F],c(3,4),sum)
+  # remove from LTC
+  X[3,-1,,] = 0
+  # another half day
+  X=SEIR.sto(X,beta=bt1,dt=0.5)
+}
+for( i in (T1+1):200) { 
+  workers=array( rbinom(Nar*(N.pat-1), rep(X[3,1,,],N.pat-1), prob= worker.n/ Npop ), c(2,8,N.pat-1))
+  X[3, 1,,]=X[3,1,,]-apply(workers,c(1,2),sum)
+  X[3,-1,,]=X[3,-1,,]+aperm(workers,c(3,1,2))
+  X=SEIR.sto(X,beta=bt2,dt=0.5)
+  Xt[i,,,] = apply(X,c(2,1,4),sum)
+#  Xt[i,,] = apply(X,c(2,4),sum)
+  X[3,1,,] = X[3,1,,]+ apply(X[3,-1,,,drop=F],c(3,4),sum)
+  X[3,-1,,] = 0
+  X=SEIR.sto(X,beta=bt2,dt=0.5)
+}
+```
+
+
+
+```{r}
+plot( cumsum(apply(Xt[,1,,IH],1,sum)))
+plot(cumsum(Xt[,1,5,IH])/ cumsum(apply(Xt[,1,,IH],1,sum)))
+plot(Xt[,1,5,IH])
+```
+
+
+```
+plot( apply(Xt[,1,,IH],1,sum)){r}
+
+```
+
+
+
+
+```{r}
+plot((1:200)/2,apply( Xt2[,,D],1,sum),type="n", ylab="deaths",xlab="days")
+lines( (1:200)/2, apply( Xt[,  ,D],1,sum))
+lines((1:200)/2,apply( Xt[,-1,D],1,sum),col=2)
+lines((1:200)/2,apply( Xt2[,,D],1,sum),col=3)
+
+```
+
+
 
 Try without LTC
 
